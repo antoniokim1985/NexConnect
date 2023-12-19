@@ -2,14 +2,14 @@ import express from 'express'
 import { createPool } from 'mysql2/promise'
 import { config } from 'dotenv'
 import bodyParser from 'body-parser';
-import jwt from 'jsonwebtoken';
+import cors from 'cors';
 
 config()
-
 
 const app = express();
 app.use(bodyParser.json());
 
+app.use(cors());
 
 const pool = createPool({
     host: process.env.MYSQLDB_HOST,
@@ -19,6 +19,7 @@ const pool = createPool({
     port:  process.env.MYSQLDB_DOCKER_PORT
 })
 
+app.use(cors());
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
