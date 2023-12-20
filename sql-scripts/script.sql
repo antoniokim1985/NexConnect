@@ -28,9 +28,9 @@ INSERT INTO roles (rol) VALUES ('admin'), ('maestro'), ('padres'), ('alumnos') ;
 
 INSERT INTO usuarios (nombre, apellido, email, password, rol_id) 
 VALUES 
-    ('admin', 'admin', 'admin@admin.com', 'admin', 1),
-    ('Maria', 'Garcia', 'maria@example.com', 'password456', 2),
-    ('Pedro', 'Martinez', 'pedro@example.com', 'securepwd789', 3);  
+    ('admin', 'admin', 'admin@admin.com', '$2b$10$52RwzQdEB5/Sq7L5OehfGeDKmw44M67khJ7Zve89g2hNH.yF4OyuG', 1),
+    ('Maria', 'Garcia', 'maria@example.com', '$2b$10$NdrZ5urFaiE0q3JsLp.KD.uA/3p.wqnINTmgOLtHxxID7G/aJLvZ2', 2),
+    ('Pedro', 'Martinez', 'pedro@example.com', '$2b$10$NdrZ5urFaiE0q3JsLp.KD.uA/3p.wqnINTmgOLtHxxID7G/aJLvZ2', 3);  
 
 
 
