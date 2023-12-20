@@ -383,14 +383,17 @@ app.put('/informacion/:id', async (req, res, next) => {
           return res.status(403).json({ error: 'Acceso denegado' });
         }
   
-        // Verificar que el usuario a modificar no tenga rol_id igual a 1
+        // Verificar que el usuario a modificar no tenga rol_id igual a 1 y sea usuario id 1
         //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
   
-        //if (user[0].length === 0 || user[0][0].rol_id === 1) {
-        //  return res.status(403).json({ error: 'No se puede modificar este usuario' });
-        //}
+        if (id == "1"){
+            if (rol_id != 1){
+              return res.status(403).json({ error: 'No se puede modificar el rol de ese usuario' });
+            }
+          
+        }
   
-        // Si el usuario tiene un rol_id distinto a 1, se procede con la modificación
+        // Si el usuario tiene un id distinto a 1, se procede con la modificación
         await pool.query(
           'UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, password = ?, rol_id = ? WHERE id = ?',
           [nombre, apellido, email, password, rol_id, id]
