@@ -2,7 +2,9 @@ import express from 'express'
 import { createPool } from 'mysql2/promise'
 import { config } from 'dotenv'
 import bodyParser from 'body-parser';
+import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import bcrypt from 'bcrypt';
 
 config()
 
@@ -31,44 +33,43 @@ app.get('/', (req, res)=> {
     res.send('API está funcionando')
 });
 
-app.post('/usuarios', async (req, res, next) => {
-    try {
-        const { nombre, apellido, email, password, rol_id } = req.body;
-        const newUser = { nombre, apellido, email, password, rol_id };
-        await pool.query('INSERT INTO usuarios SET ?', newUser);
-        res.send('Usuario creado correctamente');
-    } catch (err) {
-        next(err);
-    }
-});
 
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-  
-    try {
-      // Verificar el email en la base de datos
-      const results = await pool.query(
-        'SELECT id, email, password, rol_id FROM usuarios WHERE email = ?',
-        [email]
-      );
-      
-      if (results.length === 0 || results[0][0].password !== password) {
+  const { email, password } = req.body;
+
+  try {
+    // Verificar el email en la base de datos
+    const results = await pool.query(
+      'SELECT id, email, password, rol_id FROM usuarios WHERE email = ?',
+      [email]
+    );
+
+    if (results.length === 0) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const user = results[0][0];
+
+    // Comparar la contraseña proporcionada con la contraseña almacenada hasheada en la base de datos
+    bcrypt.compare(password, user.password, async (err, result) => {
+      if (err || !result) {
         return res.status(401).json({ error: 'Credenciales inválidas' });
       }
-  
-      const { id, rol_id } = results[0][0];
-  
+
+      const { id, rol_id } = user;
+
       // Crear un token JWT con el rol_id como información adicional
       const token = jwt.sign({ id, rol_id }, 'tu_secreto_secreto', {
         expiresIn: '1h' // Cambia esto según tus necesidades
       });
-  
+
       res.json({ token });
-    } catch (error) {
-      console.error('Error en la autenticación:', error);
-      res.status(500).json({ error: 'Error interno' });
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error en la autenticación:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
 
   app.get('/informacion', async (req, res, next) => {
     const bearerHeader = req.headers['authorization'];
@@ -318,7 +319,7 @@ app.put('/informacion/:id', async (req, res, next) => {
           return res.status(403).json({ error: 'Acceso denegado' });
         }
   
-        const result = await pool.query('SELECT * FROM usuarios WHERE rol_id != 1');
+        const result = await pool.query('SELECT id, nombre, apellido, email, rol_id FROM usuarios');
         res.status(200).json(result[0]);
       } catch (err) {
         next(err); // Pasar el error al middleware de manejo centralizado
@@ -346,9 +347,9 @@ app.put('/informacion/:id', async (req, res, next) => {
         }
   
         // Verificar que el usuario a eliminar no tenga rol_id igual a 1
-        const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
+        //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
   
-        if (user[0].length === 0 || user[0][0].rol_id === 1) {
+        if (id == "1") {
           return res.status(403).json({ error: 'No se puede eliminar este usuario' });
         }
   
@@ -383,11 +384,11 @@ app.put('/informacion/:id', async (req, res, next) => {
         }
   
         // Verificar que el usuario a modificar no tenga rol_id igual a 1
-        const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
+        //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
   
-        if (user[0].length === 0 || user[0][0].rol_id === 1) {
-          return res.status(403).json({ error: 'No se puede modificar este usuario' });
-        }
+        //if (user[0].length === 0 || user[0][0].rol_id === 1) {
+        //  return res.status(403).json({ error: 'No se puede modificar este usuario' });
+        //}
   
         // Si el usuario tiene un rol_id distinto a 1, se procede con la modificación
         await pool.query(
@@ -406,8 +407,8 @@ app.put('/informacion/:id', async (req, res, next) => {
   
 
 
-app.post('/usuarios', async (req, res, next) => {
-    const { nombre, apellido, email, password, rol_id } = req.body;
+  app.post('/usuarios', async (req, res, next) => {
+    const { nombre, apellido, email, password, rol_id: nuevoRolId } = req.body; // Usar rol_id como nuevoRolId
     const bearerHeader = req.headers['authorization'];
   
     if (typeof bearerHeader !== 'undefined') {
@@ -416,9 +417,9 @@ app.post('/usuarios', async (req, res, next) => {
   
       try {
         const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id } = decoded;
+        const { rol_id: rolToken } = decoded; // Renombrar rol_id del token a rolToken
   
-        if (rol_id !== 1) {
+        if (rolToken !== 1) {
           return res.status(403).json({ error: 'Acceso denegado' });
         }
   
@@ -429,10 +430,13 @@ app.post('/usuarios', async (req, res, next) => {
           return res.status(400).json({ error: 'El correo ya está en uso' });
         }
   
-        // Si el rol_id es igual a 1 y el correo no está repetido, se procede con la creación del usuario
+        // Encriptar la contraseña antes de almacenarla
+        const hashedPassword = await bcrypt.hash(password, 10);
+  
+        // Insertar el usuario con la contraseña encriptada y el rol_id proporcionado
         await pool.query(
           'INSERT INTO usuarios (nombre, apellido, email, password, rol_id) VALUES (?, ?, ?, ?, ?)',
-          [nombre, apellido, email, password, rol_id]
+          [nombre, apellido, email, hashedPassword, nuevoRolId] // Usar nuevoRolId aquí
         );
   
         res.status(201).json({ message: 'Usuario creado exitosamente' });
@@ -443,6 +447,7 @@ app.post('/usuarios', async (req, res, next) => {
       res.sendStatus(403); // No se proporcionó el token de portador
     }
   });
+  
 
 app.listen(3000)
 console.log('Server on port', 3000)
