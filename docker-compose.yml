@@ -12,11 +12,22 @@ services:
     volumes:
       - ./sql-scripts:/docker-entrypoint-initdb.d
 
-  app:
-    build: .
+  app_back:
+    build: ./back
     depends_on:
       - mysqldb
     links:
       - mysqldb
     ports: 
       - 3000:3000
+
+  app_front:
+    build: ./front
+    depends_on:
+      - mysqldb
+      - app_back
+    links:
+      - mysqldb
+      - app_back
+    ports: 
+      - 8080:8080
