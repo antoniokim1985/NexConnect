@@ -14,6 +14,7 @@ services:
 
   app_back:
     build: ./back
+    env_file: ./.env
     depends_on:
       - mysqldb
     links:

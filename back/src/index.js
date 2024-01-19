@@ -5,13 +5,22 @@ import bodyParser from 'body-parser';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 config()
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const __prevDirname = path.join(__dirname, '..');
 const app = express();
-app.use(bodyParser.json());
 
+app.use(bodyParser.json());
 app.use(cors());
+app.use('/imagenes', express.static(path.join(__prevDirname, 'imagenes')));
+app.use('/archivos', express.static(path.join(__prevDirname, 'archivos')));
 
 const pool = createPool({
     host: process.env.MYSQLDB_HOST,
@@ -20,6 +29,34 @@ const pool = createPool({
     password:  process.env.MYSQLDB_ROOT_PASSWORD,
     port:  process.env.MYSQLDB_DOCKER_PORT
 })
+
+//----------------------------------------------------
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      let destinationPath;
+
+      if (file.fieldname === "imagen") {
+        destinationPath = 'imagenes/';
+      } else if (file.fieldname === "archivo") {
+        destinationPath = 'archivos/';
+      }
+
+      // Crear el directorio si no existe
+      if (!fs.existsSync(destinationPath)) {
+        fs.mkdirSync(destinationPath, { recursive: true });
+      }
+
+      cb(null, destinationPath);
+    },
+    filename: function (req, file, cb) {
+      cb(null, Date.now() + '-' + file.originalname);
+    }
+  })
+});
+
+//----------------------------------------------------
 
 app.use(cors());
 
@@ -32,7 +69,6 @@ app.use((err, req, res, next) => {
 app.get('/', (req, res)=> {
     res.send('API está funcionando')
 });
-
 
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -71,34 +107,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
-  app.get('/informacion', async (req, res, next) => {
-    const bearerHeader = req.headers['authorization'];
-  
-    if (typeof bearerHeader !== 'undefined') {
-      const bearer = bearerHeader.split(' ');
-      const bearerToken = bearer[1];
-  
-      try {
-        const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id } = decoded;
-  
-        let query = 'SELECT * FROM informacion;';
-  
-        if (rol_id !== 1) {
-          query = `SELECT * FROM informacion WHERE rol_id = ${pool.escape(rol_id)};`;
-        }
-  
-        const result = await pool.query(query);
-        res.json(result[0]);
-      } catch (err) {
-        next(err);
-      }
-    } else {
-      res.sendStatus(403); // No se proporcionó el token de portador
-    }
-  });
-
-  app.get('/roles', async (req, res, next) => {
+app.get('/informacion', async (req, res, next) => {
   const bearerHeader = req.headers['authorization'];
 
   if (typeof bearerHeader !== 'undefined') {
@@ -109,17 +118,28 @@ app.post('/login', async (req, res) => {
       const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
       const { rol_id } = decoded;
 
+      let query = 'SELECT * FROM informacion;';
+
       if (rol_id !== 1) {
-        return res.status(403).json({ error: 'Acceso denegado' });
+        query = `SELECT * FROM informacion WHERE rol_id = ${pool.escape(rol_id)};`;
       }
 
-      const roles = await pool.query('SELECT * FROM roles');
-      res.status(200).json(roles[0]);
+      const result = await pool.query(query);
+      res.json(result[0]);
     } catch (err) {
-      next(err); // Pasar el error al middleware de manejo centralizado
+      next(err);
     }
   } else {
     res.sendStatus(403); // No se proporcionó el token de portador
+  }
+});
+
+app.get('/roles', async (req, res, next) => {
+  try {
+    const roles = await pool.query('SELECT * FROM roles');
+    res.status(200).json(roles[0]);
+  } catch (err) {
+    next(err); // Pasar el error al middleware de manejo centralizado
   }
 });
 
@@ -182,7 +202,7 @@ app.delete('/roles/:id', async (req, res, next) => {
     } else {
       res.sendStatus(403); // No se proporcionó el token de portador
     }
-  });
+});
 
 app.put('/roles/:id', async (req, res, next) => {
   const { id } = req.params;
@@ -213,36 +233,44 @@ app.put('/roles/:id', async (req, res, next) => {
   }
 });
 
-app.post('/informacion', async (req, res, next) => {
-    const { rol_id, url_imagen, url_archivo, titulo, descripcion } = req.body;
-    const bearerHeader = req.headers['authorization'];
-  
-    if (typeof bearerHeader !== 'undefined') {
+app.post('/informacion', 
+  upload.fields([
+    { name: 'imagen', maxCount: 1 },
+    { name: 'archivo', maxCount: 1 }
+  ]), 
+  async (req, res, next) => {
+    const { rol_id, titulo, descripcion } = req.body;
+    const url_imagen = req.files['imagen'] && req.files['imagen'].length > 0 ? req.files['imagen'][0].path : null;
+    const url_archivo = req.files['archivo'] && req.files['archivo'].length > 0 ? req.files['archivo'][0].path : null;
+
+
+  const bearerHeader = req.headers['authorization'];
+
+  if (typeof bearerHeader !== 'undefined') {
       const bearer = bearerHeader.split(' ');
       const bearerToken = bearer[1];
-  
+
       try {
-        const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id: userRolId } = decoded;
-  
-        if (userRolId !== 1) {
-          return res.status(403).json({ error: 'Acceso denegado' });
-        }
-  
-        // Solo el rol_id igual a 1 puede agregar datos a la tabla informacion
-        await pool.query(
-          'INSERT INTO informacion (rol_id, url_imagen, url_archivo, titulo, descripcion) VALUES (?, ?, ?, ?, ?)',
-          [rol_id, url_imagen, url_archivo, titulo, descripcion]
-        );
-  
-        res.status(201).json({ message: 'Información creada exitosamente' });
+          const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
+          const { rol_id: userRolId } = decoded;
+
+          if (userRolId !== 1) {
+              return res.status(403).json({ error: 'Acceso denegado' });
+          }
+
+          await pool.query(
+              'INSERT INTO informacion (rol_id, url_imagen, url_archivo, titulo, descripcion) VALUES (?, ?, ?, ?, ?)',
+              [rol_id, url_imagen, url_archivo, titulo, descripcion]
+          );
+
+          res.status(201).json({ message: 'Información creada exitosamente' });
       } catch (err) {
-        next(err); // Pasar el error al middleware de manejo centralizado
+          next(err); // Manejo de errores
       }
-    } else {
+  } else {
       res.sendStatus(403); // No se proporcionó el token de portador
-    }
-  });
+  }
+});
 
 app.delete('/informacion/:id', async (req, res, next) => {
     const { id } = req.params;
@@ -270,11 +298,20 @@ app.delete('/informacion/:id', async (req, res, next) => {
     } else {
       res.sendStatus(403); // No se proporcionó el token de portador
     }
-  });
+});
 
-app.put('/informacion/:id', async (req, res, next) => {
+app.put('/informacion/:id', 
+  upload.fields([
+    { name: 'imagen', maxCount: 1 },
+    { name: 'archivo', maxCount: 1 }
+  ]), 
+  async (req, res, next) => {
     const { id } = req.params;
-    const { rol_id, url_imagen, url_archivo, titulo, descripcion } = req.body;
+    const { rol_id, titulo, descripcion } = req.body;
+  
+    const url_imagen = req.files['imagen'] && req.files['imagen'].length > 0 ? req.files['imagen'][0].path : null;
+    const url_archivo = req.files['archivo'] && req.files['archivo'].length > 0 ? req.files['archivo'][0].path : null;
+  
     const bearerHeader = req.headers['authorization'];
   
     if (typeof bearerHeader !== 'undefined') {
@@ -289,22 +326,45 @@ app.put('/informacion/:id', async (req, res, next) => {
           return res.status(403).json({ error: 'Acceso denegado' });
         }
   
-        // Solo el rol_id igual a 1 puede actualizar datos en la tabla informacion
-        await pool.query(
-          'UPDATE informacion SET rol_id = ?, url_imagen = ?, url_archivo = ?, titulo = ?, descripcion = ? WHERE id = ?',
-          [rol_id, url_imagen, url_archivo, titulo, descripcion, id]
-        );
+        // Obtener los datos actuales de la base de datos
+        const oldData = await pool.query('SELECT rol_id, titulo, descripcion, url_imagen, url_archivo FROM informacion WHERE id = ?', [id]);
+        if (oldData.length > 0) {
+          const data = oldData[0][0];
+          const oldUrlImagen = data.url_imagen;
+          const oldUrlArchivo = data.url_archivo;
   
-        res.status(200).json({ message: 'Información actualizada exitosamente' });
+          // Comparar y decidir qué valores actualizar
+          const newRolId = rol_id !== data.rol_id ? rol_id : data.rol_id;
+          const newTitulo = titulo !== data.titulo ? titulo : data.titulo;
+          const newDescripcion = descripcion !== data.descripcion ? descripcion : data.descripcion;
+          const newUrlImagen = url_imagen && url_imagen !== oldUrlImagen ? url_imagen : oldUrlImagen;
+          const newUrlArchivo = url_archivo && url_archivo !== oldUrlArchivo ? url_archivo : oldUrlArchivo;
+  
+          // Eliminar archivos antiguos si los nuevos son diferentes
+          if (url_imagen && url_imagen !== oldUrlImagen && oldUrlImagen) fs.unlinkSync(oldUrlImagen);
+          if (url_archivo && url_archivo !== oldUrlArchivo && oldUrlArchivo) fs.unlinkSync(oldUrlArchivo);
+  
+          // Actualizar la base de datos
+          await pool.query(
+            'UPDATE informacion SET rol_id = ?, titulo = ?, descripcion = ?, url_imagen = ?, url_archivo = ? WHERE id = ?',
+            [newRolId, newTitulo, newDescripcion, newUrlImagen, newUrlArchivo, id]
+          );
+  
+          res.status(200).json({ message: 'Información actualizada exitosamente' });
+        } else {
+          res.status(404).json({ error: 'Información no encontrada' });
+        }
       } catch (err) {
-        next(err); // Pasar el error al middleware de manejo centralizado
+        next(err); // Manejo de errores
       }
     } else {
       res.sendStatus(403); // No se proporcionó el token de portador
     }
-  });
+});
 
-  app.get('/usuarios', async (req, res, next) => {
+
+
+app.get('/usuarios', async (req, res, next) => {
     const bearerHeader = req.headers['authorization'];
   
     if (typeof bearerHeader !== 'undefined') {
@@ -319,7 +379,7 @@ app.put('/informacion/:id', async (req, res, next) => {
           return res.status(403).json({ error: 'Acceso denegado' });
         }
   
-        const result = await pool.query('SELECT id, nombre, apellido, email, rol_id FROM usuarios');
+        const result = await pool.query('SELECT id, nombre, apellido, email, password, rol_id FROM usuarios');
         res.status(200).json(result[0]);
       } catch (err) {
         next(err); // Pasar el error al middleware de manejo centralizado
@@ -327,130 +387,169 @@ app.put('/informacion/:id', async (req, res, next) => {
     } else {
       res.sendStatus(403); // No se proporcionó el token de portador
     }
-  });
-  
+});
 
-  app.delete('/usuarios/:id', async (req, res, next) => {
-    const { id } = req.params;
-    const bearerHeader = req.headers['authorization'];
-  
-    if (typeof bearerHeader !== 'undefined') {
+app.get('/usuarios/:id', async (req, res, next) => {
+  const bearerHeader = req.headers['authorization'];
+
+  if (typeof bearerHeader !== 'undefined') {
       const bearer = bearerHeader.split(' ');
       const bearerToken = bearer[1];
-  
+
       try {
-        const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id } = decoded;
-  
-        if (rol_id !== 1) {
-          return res.status(403).json({ error: 'Acceso denegado' });
-        }
-  
-        // Verificar que el usuario a eliminar no tenga rol_id igual a 1
-        //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
-  
-        if (id == "1") {
-          return res.status(403).json({ error: 'No se puede eliminar este usuario' });
-        }
-  
-        // Si el usuario tiene un rol_id distinto a 1, se procede con la eliminación
-        await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
-  
-        res.status(200).json({ message: 'Usuario eliminado exitosamente' });
+          const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
+
+          // Capturando el id del parámetro de ruta
+          const userId = req.params.id;
+
+          // Consulta para obtener los datos del usuario específico
+          const result = await pool.query('SELECT id, nombre, apellido, email, rol_id FROM usuarios WHERE id = ?', [userId]);
+
+          // Verificar si se encontró el usuario
+          if (result[0].length === 0) {
+              return res.status(404).json({ error: 'Usuario no encontrado' });
+          }
+
+          res.status(200).json(result[0][0]);
       } catch (err) {
-        next(err); // Pasar el error al middleware de manejo centralizado
+          next(err); // Pasar el error al middleware de manejo centralizado
       }
-    } else {
+  } else {
       res.sendStatus(403); // No se proporcionó el token de portador
-    }
-  });
+  }
+});
 
+app.delete('/usuarios/:id', async (req, res, next) => {
+  const { id } = req.params;
+  const bearerHeader = req.headers['authorization'];
 
-  app.put('/usuarios/:id', async (req, res, next) => {
-    const { id } = req.params;
-    const { nombre, apellido, email, password, rol_id } = req.body;
-    const bearerHeader = req.headers['authorization'];
-  
-    if (typeof bearerHeader !== 'undefined') {
-      const bearer = bearerHeader.split(' ');
-      const bearerToken = bearer[1];
-  
-      try {
-        const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id: userRolId, id: userId } = decoded;
-  
-        if (userRolId !== 1 && id !== userId) {
-          return res.status(403).json({ error: 'Acceso denegado' });
-        }
-  
-        // Verificar que el usuario a modificar no tenga rol_id igual a 1 y sea usuario id 1
-        //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
-  
-        if (id == "1"){
-            if (rol_id != 1){
-              return res.status(403).json({ error: 'No se puede modificar el rol de ese usuario' });
-            }
-          
-        }
-  
-        // Si el usuario tiene un id distinto a 1, se procede con la modificación
-        await pool.query(
-          'UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, password = ?, rol_id = ? WHERE id = ?',
-          [nombre, apellido, email, password, rol_id, id]
-        );
-  
-        res.status(200).json({ message: 'Usuario actualizado exitosamente' });
-      } catch (err) {
-        next(err); // Pasar el error al middleware de manejo centralizado
+  if (typeof bearerHeader !== 'undefined') {
+    const bearer = bearerHeader.split(' ');
+    const bearerToken = bearer[1];
+
+    try {
+      const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
+      const { rol_id } = decoded;
+
+      if (rol_id !== 1) {
+        return res.status(403).json({ error: 'Acceso denegado' });
       }
-    } else {
-      res.sendStatus(403); // No se proporcionó el token de portador
-    }
-  });
-  
 
+      // Verificar que el usuario a eliminar no tenga rol_id igual a 1
+      //const user = await pool.query('SELECT rol_id FROM usuarios WHERE id = ?', [id]);
 
-  app.post('/usuarios', async (req, res, next) => {
-    const { nombre, apellido, email, password, rol_id: nuevoRolId } = req.body; // Usar rol_id como nuevoRolId
-    const bearerHeader = req.headers['authorization'];
-  
-    if (typeof bearerHeader !== 'undefined') {
-      const bearer = bearerHeader.split(' ');
-      const bearerToken = bearer[1];
-  
-      try {
-        const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
-        const { rol_id: rolToken } = decoded; // Renombrar rol_id del token a rolToken
-  
-        if (rolToken !== 1) {
-          return res.status(403).json({ error: 'Acceso denegado' });
-        }
-  
-        // Verificar si el correo ya existe en algún usuario
-        const existingUser = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-  
-        if (existingUser[0].length > 0) {
-          return res.status(400).json({ error: 'El correo ya está en uso' });
-        }
-  
-        // Encriptar la contraseña antes de almacenarla
-        const hashedPassword = await bcrypt.hash(password, 10);
-  
-        // Insertar el usuario con la contraseña encriptada y el rol_id proporcionado
-        await pool.query(
-          'INSERT INTO usuarios (nombre, apellido, email, password, rol_id) VALUES (?, ?, ?, ?, ?)',
-          [nombre, apellido, email, hashedPassword, nuevoRolId] // Usar nuevoRolId aquí
-        );
-  
-        res.status(201).json({ message: 'Usuario creado exitosamente' });
-      } catch (err) {
-        next(err); // Pasar el error al middleware de manejo centralizado
+      if (id == "1") {
+        return res.status(403).json({ error: 'No se puede eliminar este usuario' });
       }
-    } else {
-      res.sendStatus(403); // No se proporcionó el token de portador
+
+      // Si el usuario tiene un rol_id distinto a 1, se procede con la eliminación
+      await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+
+      res.status(200).json({ message: 'Usuario eliminado exitosamente' });
+    } catch (err) {
+      next(err); // Pasar el error al middleware de manejo centralizado
     }
-  });
-  
+  } else {
+    res.sendStatus(403); // No se proporcionó el token de portador
+  }
+});
+
+
+app.put('/usuarios/:id', async (req, res, next) => {
+  const { id } = req.params;
+  const { nombre, apellido, email, password, rol_id } = req.body;
+  const bearerHeader = req.headers['authorization'];
+
+  if (typeof bearerHeader !== 'undefined') {
+    const bearer = bearerHeader.split(' ');
+    const bearerToken = bearer[1];
+
+    try {
+      const decoded = jwt.verify(bearerToken, 'tu_secreto_secreto');
+      const { rol_id: userRolId, id: userId } = decoded;
+
+      if (userRolId !== 1 && id !== userId) {
+        return res.status(403).json({ error: 'Acceso denegado' });
+      }
+
+      if (id == "1" && rol_id != 1) {
+        return res.status(403).json({ error: 'No se puede modificar el rol de ese usuario' });
+      }
+
+      // Obtener la contraseña actual del usuario desde la base de datos
+      const [userData] = await pool.query('SELECT password FROM usuarios WHERE id = ?', [id]);
+      const currentPassword = userData[0].password;
+
+      // Crear un arreglo para los valores y una cadena para la consulta SQL
+      let query = 'UPDATE usuarios SET ';
+      let queryParams = [];
+      let queryFields = [];
+
+      if (nombre) {
+        queryFields.push('nombre = ?');
+        queryParams.push(nombre);
+      }
+      if (apellido) {
+        queryFields.push('apellido = ?');
+        queryParams.push(apellido);
+      }
+      if (email) {
+        queryFields.push('email = ?');
+        queryParams.push(email);
+      }
+      if (password && password !== currentPassword) {
+        const hashedPassword = await bcrypt.hash(password, 10); // Encriptar la nueva contraseña
+        queryFields.push('password = ?');
+        queryParams.push(hashedPassword);
+      }
+      if (rol_id) {
+        queryFields.push('rol_id = ?');
+        queryParams.push(rol_id);
+      }
+
+      if (queryFields.length === 0) {
+        return res.status(400).json({ error: 'No hay datos para actualizar' });
+      }
+
+      query += queryFields.join(', ');
+      query += ' WHERE id = ?';
+      queryParams.push(id);
+
+      await pool.query(query, queryParams);
+      res.status(200).json({ message: 'Usuario actualizado exitosamente' });
+    } catch (err) {
+      next(err); // Pasar el error al middleware de manejo centralizado
+    }
+  } else {
+    res.sendStatus(403); // No se proporcionó el token de portador
+  }
+});
+
+app.post('/usuarios', async (req, res, next) => {
+  const { nombre, apellido, email, password, rol_id: nuevoRolId } = req.body; // Usar rol_id como nuevoRolId
+
+    try {  
+      // Verificar si el correo ya existe en algún usuario
+      const existingUser = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
+
+      if (existingUser[0].length > 0) {
+        return res.status(400).json({ error: 'El correo ya está en uso' });
+      }
+
+      // Encriptar la contraseña antes de almacenarla
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Insertar el usuario con la contraseña encriptada y el rol_id proporcionado
+      await pool.query(
+        'INSERT INTO usuarios (nombre, apellido, email, password, rol_id) VALUES (?, ?, ?, ?, ?)',
+        [nombre, apellido, email, hashedPassword, nuevoRolId] // Usar nuevoRolId aquí
+      );
+
+      res.status(201).json({ message: 'Usuario creado exitosamente' });
+    } catch (err) {
+      next(err); // Pasar el error al middleware de manejo centralizado
+    }
+});
 
 app.listen(3000)
 console.log('Server on port', 3000)

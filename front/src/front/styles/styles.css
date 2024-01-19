@@ -1,4 +1,117 @@
-.texto{
-    color:red;
-    font-family: 'Times New Roman', Times, serif;
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+
+body{
+    font-family: 'Raleway', sans-serif;
+    background-color: #F8FAFD ;
+}
+
+
+body.dark {
+    /* Estilos específicos para el modo oscuro */
+    
+    background-color: #2b4162;
+    background-image: linear-gradient(315deg, #2b4162 0%, #12100e 74%);
+
+    color: #e6e6e6;
+  }
+
+label{
+    font-family: 'Raleway', sans-serif;
+}
+
+.form-control::placeholder{
+    font-family: 'Raleway', sans-serif;
+}
+.big-text{
+    font-family: 'Inter', sans-serif;
+    
+}
+
+p.p-alerta{
+    font-family: 'Raleway', sans-serif;
+    font-weight: 200;
+    font-size: 12px;
+    
+  }
+
+
+.logo-nav{
+    width: 20px;
+    height: 20px;
+}
+
+.swal-small{
+    background-color: #ffffffef;
+}
+.transparent-table{
+    background-color: transparent;
+}
+.table-hover tbody tr:hover td,
+.table-hover tbody tr:hover th td:hover {
+  transition: 0.8s;
+  /* Ajusta el valor según tus preferencias */
+color:black;
+
+}
+
+.custom-page-class{
+    color: #1D1D1F; /* Cambia esto al color que desees */
+    cursor: pointer; /* Cambia esto según tus preferencias */
+    padding: 8px; 
+    transition: 0.3s;/* Añade relleno según tus preferencias */
+  }
+  .custom-page-class:hover {
+   text-decoration: underline #1D1D1F;
+   
+  }
+  .pagination .active {
+     /* Cambia esto al color que desees */
+    border-radius: 50%; /* Hace que sea un círculo */
+    color: #2a00e6;
+    
+    font-size: 18px;/* Cambia esto al color del texto que desees */
+    cursor: pointer; /* Cambia esto según tus preferencias */
+    padding: 8px; /* Añade relleno según tus preferencias */
+  }
+  
+  
+  /* Estilos CSS para cambiar el color del texto de "Anterior" */
+.custom-previous-class {
+    color: #1D1D1F; /* Cambia esto al color que desees */
+    cursor: pointer; /* Cambia esto según tus preferencias */
+    padding: 8px; /* Añade relleno según tus preferencias */
+  }
+  
+  /* Estilos CSS para cambiar el color del texto de "Siguiente" */
+  .custom-next-class {
+    color: #1D1D1F; /* Cambia esto al color que desees */
+    cursor: pointer; /* Cambia esto según tus preferencias */
+    padding: 8px; /* Añade relleno según tus preferencias */
+  }
+
+  .table td {
+    white-space: nowrap;
+  }
+
+  .edit-icons-container {
+    display: flex;
+    justify-content: space-around;  
+    width: 50px;  
+  }
+
+  .text-line{
+    -webkit-text-stroke: 2px #212529;
+    
+}
+
+.bigtext{
+    font-family:  'Archivo Black', sans-serif;
+    font-size: 70px;
+    font-weight: 800;
+    letter-spacing: 0;
+    
 }

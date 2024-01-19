@@ -1,4 +1,3 @@
-# Dockerfile dentro de la carpeta "back"
 FROM node:18
 
 WORKDIR /myapp

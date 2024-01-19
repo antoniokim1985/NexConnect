@@ -1,7 +1,7 @@
 {
-  "name": "safeview",
+  "name": "nexconnect",
   "version": "1.0.0",
-  "description": "safeview is a project to ensure the vision of safe content to 3th parties",
+  "description": "nexconnect is a project to ensure the vision of content to 3th parties",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -17,6 +17,10 @@
     "jsonwebtoken": "^8.5.1",
     "cors": "^2.8.5",
     "bcrypt": "^5.0.1",
-    "nodemon": "2.0.12"
+    "nodemon": "2.0.12",
+    "multer": "^1.4.4",
+    "fs": "0.0.1-security",
+    "path": "0.12.7",
+    "url": "0.11.0"
   }
 }

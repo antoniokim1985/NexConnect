@@ -1,5 +1,11 @@
 import logo from './logo.svg';
 import './App.css';
+import 'material-tailwind/dist/material-tailwind.min.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min';
+import 'jquery';
+import 'popper.js';
+
 
 function App() {
   return (
