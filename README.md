@@ -8,7 +8,7 @@ Es ideal para instituciones educativas que quieren comunicarse con docentes, pad
 
 Para poder utilizar la aplicación
 
-Descarga e instala Docker y Docker compose según la documentación oficial.
+Descarga e instala Docker y Docker compose según la [documentación oficial](https://www.docker.com/).
 
 Estando en el directorio Nexconnect ejecutá el comando 
 
