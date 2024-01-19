@@ -22,13 +22,13 @@ services:
     ports: 
       - 3000:3000
 
-  app_front:
-    build: ./front
-    depends_on:
-      - mysqldb
-      - app_back
-    links:
-      - mysqldb
-      - app_back
-    ports: 
-      - 8080:8080
+#  app_front:
+#    build: ./front
+#    depends_on:
+#      - mysqldb
+#      - app_back
+    # links:
+    #   - mysqldb
+    #   - app_back
+    # ports: 
+    #   - 8080:8080
