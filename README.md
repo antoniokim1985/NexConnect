@@ -17,3 +17,27 @@ docker compose up
 ```
 
 Luego de que se despliega el servidor, puedes ingresar a https://localhost:8080
+
+----------------
+
+
+Para el desarrollo de esta aplicación se han utilizado las siguientes tecnologías:
+
+
+### Gestion de versiones y repositorio
+- Git
+
+### Infraestructura
+- Docker
+- Docker compose
+
+### Back-end
+- Mysql
+- NodeJs
+
+### Front-end
+- HTML
+- CSS
+- Javascript
+- ReactJS
+- Tailwind
